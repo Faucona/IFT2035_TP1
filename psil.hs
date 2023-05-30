@@ -214,10 +214,11 @@ data Ldec = Ldec Var Ltype      -- Déclaration globale.
 s2t :: Sexp -> Ltype
 s2t (Ssym "Int") = Lint
 -- ¡¡COMPLÉTER ICI!!
+s2t (Snum _) = Lint 
 s2t (Scons t Snil) = s2t t
-s2t (Scons t1(Scons(Ssym"->")(Scons t2 Snil))) =
-    Larw (s2t t1) (s2t t2)
-s2t (Scons t1 t2) = Larw (s2t t1) (s2t t2)
+s2t (Scons Snil t) = s2t t
+s2t (Scons sexp1 sexp2) = Larw (s2t sexp2) (s2t sexp1)  
+s2t (Ssym _) = Lint 
 s2t se = error ("Type Psil inconnu: " ++ (showSexp se))
 -- Analyse un Sexp et construit une Lexp équivalente
 s2l :: Sexp -> Lexp
