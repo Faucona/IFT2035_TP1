@@ -225,11 +225,13 @@ s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
 -- ¡¡COMPLÉTER ICI!!
-s2l (Ssym "nil") = Lnil
-s2l (Snil) = Lnil
-s2l (Scons e Snil) = s2l e
-s2l (Scons (Ssym "cons")(Scons e1(Scons e2 Snil)))=
-    Lcons (s2l e1)(s2l e2)
+s2l (Snil) =  error ("erreur liste vide recu")  
+s2l (Scons t Snil) = s2l t
+s2l (Scons Snil t) = s2l t
+s2l (Scons (Scons (Scons Snil (Ssym "let")) (Scons Snil (Scons (Scons Snil (Ssym var)) sexp1))) sexp2) = Llet var (s2l sexp1) (s2l sexp2)
+s2l (Scons (Scons (Scons Snil (Ssym "fun")) (Ssym var)) sexp1) = Lfun var (s2l sexp1)
+s2l (Scons (Scons (Scons Snil (Ssym ":")) sexp1) sexp2) = Lhastype (s2l sexp1) (s2t sexp2)
+s2l (Scons sexp1 sexp2) = Lapp  (s2l sexp2) (s2l sexp1)
 s2l se = error ("Expression Psil inconnue: " ++ (showSexp se))
 
 s2d :: Sexp -> Ldec
