@@ -219,7 +219,9 @@ s2t (Scons t Snil) = s2t t
 s2t (Scons Snil t) = s2t t
 s2t (Scons sexp1 sexp2) = Larw (s2t sexp2) (s2t sexp1)  
 s2t (Ssym _) = Lint 
+s2t (Scons sexp1 (Scons(Ssym "->")(Scons sexp2 Snil)))= Larw (s2t sexp1) (s2t sexp2)
 s2t se = error ("Type Psil inconnu: " ++ (showSexp se))
+
 -- Analyse un Sexp et construit une Lexp équivalente
 s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
