@@ -213,16 +213,36 @@ data Ldec = Ldec Var Ltype      -- Déclaration globale.
 
 s2t :: Sexp -> Ltype
 s2t (Ssym "Int") = Lint
--- ¡¡COMPLÉTER ICI!!
-s2t (Snum _) = Lint 
+s2t (Snil) = error "Empty expression received"
+s2t (Snum _) = Lint
 s2t (Scons t Snil) = s2t t
 s2t (Scons Snil t) = s2t t
-s2t (Scons sexp1 sexp2) = Larw (s2t sexp2) (s2t sexp1)  
-s2t (Ssym _) = Lint 
-s2t (Scons sexp1 (Scons(Ssym "->")(Scons sexp2 Snil)))= Larw (s2t sexp1) (s2t sexp2)
-s2t se = error ("Type Psil inconnu: " ++ (showSexp se))
+s2t (Scons (Scons sexp1 (Ssym "->")) sexp2) 
+  | Larw (s2t sexp1) (s2t sexp2) == Larw (Larw Lint Lint) Lint = Larw Lint (Larw Lint Lint) 
+  | otherwise = Larw (s2t sexp1) (s2t sexp2)
+s2t (Scons (Scons (Scons Snil (Ssym "fun")) (Ssym var)) val) = Larw Lint (s2t val)
+s2t (Scons (Scons (Scons Snil (Ssym ":")) val) ssym) = (s2t ssym)
+s2t (Scons (Scons (Scons Snil (Ssym "def")) (Ssym var)) (Scons (op) val)) 
+  | op == Scons Snil (Ssym "+") || op == Scons Snil (Ssym "-") || op == Scons Snil (Ssym "/") || op == Scons Snil (Ssym "*") = Larw Lint (s2t val)
+  | containsFun val = Larw Lint (s2t val)
+  | otherwise = Lint 
+s2t (Scons (Scons (Scons Snil (Ssym "def")) (Ssym var)) val) = (s2t val)
+s2t (Scons (Scons (Scons Snil (Ssym "dec")) (Ssym var)) val) = (s2t val)
+s2t (Scons (Scons (Scons Snil (Ssym _)) (Ssym var)) val) = (s2t val)
+s2t (Scons sexp1 sexp2) = Larw (s2t sexp1) (s2t sexp2)
+s2t (Ssym "+") = Larw Lint (Larw Lint Lint)
+s2t (Ssym "-") = Larw Lint (Larw Lint Lint)
+s2t (Ssym "/") = Larw Lint (Larw Lint Lint)
+s2t (Ssym "*") = Larw Lint (Larw Lint Lint)
+s2t se = error ("Unknown Sexp type: " ++ show se)
 
--- Analyse un Sexp et construit une Lexp équivalente
+-- need this function to see if def contains fun
+containsFun :: Sexp -> Bool
+containsFun (Scons (Scons (Scons Snil (Ssym "fun")) _) _) = True 
+containsFun _ = False
+
+
+
 s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
@@ -230,15 +250,32 @@ s2l (Ssym s) = Lvar s
 s2l (Snil) =  error ("erreur liste vide recu")  
 s2l (Scons t Snil) = s2l t
 s2l (Scons Snil t) = s2l t
-s2l (Scons (Scons (Scons Snil (Ssym "let")) (Scons Snil (Scons (Scons Snil (Ssym var)) sexp1))) sexp2) = Llet var (s2l sexp1) (s2l sexp2)
-s2l (Scons (Scons (Scons Snil (Ssym "fun")) (Ssym var)) sexp1) = Lfun var (s2l sexp1)
-s2l (Scons (Scons (Scons Snil (Ssym ":")) sexp1) sexp2) = Lhastype (s2l sexp1) (s2t sexp2)
-s2l (Scons sexp1 sexp2) = Lapp  (s2l sexp2) (s2l sexp1)
+s2l (Scons (Scons sexp1 (Ssym "->")) sexp2) = Lhastype (s2l sexp1) (s2t sexp2)
+s2l (Scons (Scons Snil (Ssym "let")) (Scons Snil (Scons (Scons Snil (Ssym var)) sexp1 ))) = Llet var (s2l (Ssym var)) (s2l sexp1)
+s2l (Scons (Scons (Scons Snil (Ssym "dec")) (Ssym var)) val) 
+  | val == Ssym "Int" = Llet var (s2l (Ssym var)) (Lhastype (s2l (Ssym var)) (s2t val) )
+  | otherwise = Llet var (s2l (Ssym var)) (Lhastype (Lfun var (s2l val) ) (s2t val) )
+s2l (Scons (Scons (Scons Snil (Ssym "def")) (Ssym var)) (Snum val)) = Llet var (s2l (Ssym var)) (s2l (Snum val))
+s2l (Scons (Scons (Scons Snil (Ssym "def")) (Ssym var)) (Scons sexp1 sexp2) ) = Llet var (s2l (Ssym var))  (Lapp (s2l  sexp1) (s2l sexp2) )
+s2l (Scons (Scons (Scons Snil (Ssym "def")) (Ssym var)) val) 
+  | val  == Ssym "+" || val  == Ssym "-" || val  == Ssym "/" || val  == Ssym "*" =  Llet var (s2l (Ssym var)) (Lhastype (s2l val) (s2t val)) 
+  | var  == "recursive" = Llet var (s2l (Ssym var)) (s2l val)
+  | otherwise = error ("test2")--Llet var (s2l (Ssym var))  (Lapp (s2l  val) )
+s2l (Scons (Scons (Scons Snil (Ssym "fun")) (Ssym var)) val) = Lfun var (s2l val)
+s2l (Scons (Scons (Scons Snil (Ssym ":")) val) ssym) = Lhastype (s2l val) (s2t ssym)
+s2l (Scons sexp1 sexp2) = Lapp (s2l sexp1) (s2l sexp2)
 s2l se = error ("Expression Psil inconnue: " ++ (showSexp se))
+
+--Scons (Scons (Scons Snil (Ssym "def")) (Ssym "r2")) (Ssym "+")
+
 
 s2d :: Sexp -> Ldec
 s2d (Scons (Scons (Scons Snil (Ssym "def")) (Ssym v)) e) = Ldef v (s2l e)
 -- ¡¡COMPLÉTER ICI!!
+s2d (Scons (Scons (Scons Snil (Ssym "dec")) (Ssym v)) e) = Ldec v (s2t e)
+s2d (snil) =  error ("erreur liste vide recu")  
+s2d (Ssym s) = error ("erreur string recu mais pas associer à une variable") 
+s2d (Snum n) = error ("erreur int recu mais pas associer à une variable") 
 s2d se = error ("Déclaration Psil inconnue: " ++ showSexp se)
 
 ---------------------------------------------------------------------------
@@ -271,7 +308,12 @@ tenv0 = [("+", Larw Lint (Larw Lint Lint)),
 
 -- `check Γ e τ` vérifie que `e` a type `τ` dans le contexte `Γ`.
 check :: TEnv -> Lexp -> Ltype -> Maybe TypeError
+
+--check tenv (exp1 exp2) t = 
+
+
 -- ¡¡COMPLÉTER ICI!!
+
 check tenv e t
   -- Essaie d'inférer le type et vérifie alors s'il correspond au
   -- type attendu.
@@ -289,9 +331,28 @@ synth tenv (Lhastype e t) =
       Nothing -> t
       Just err -> error err
 -- ¡¡COMPLÉTER ICI!!
+synth tenv (Llet x e1 e2) = 
+    case check tenv e2 (synth tenv e2) of
+      Nothing -> synth ((x, (synth tenv e2) ) : tenv ) e2
+      Just err -> error err
+
+-- -- Llet "r7" (Lvar "r7") (Lapp (Llet "x" (Lvar "x") (Lnum 5)) (Lapp (Lapp (Lvar "*") (Lvar "x")) (Lnum 4)))     
+synth tenv (Lapp e1 e2) =
+    case (check tenv e1 (synth tenv e1)) of
+      Nothing ->  
+        case (check tenv e2 (synth tenv e2)) of 
+        Nothing -> 
+          if (Larw (synth tenv e2) (synth tenv e1)) == Larw Lint (Larw Lint (Larw Lint Lint)) then Larw Lint Lint
+          else (synth tenv e2)
+        Just err -> error err
+      Just err -> error err
+
+
+
+
 synth _tenv e = error ("Incapable de trouver le type de: " ++ (show e))
 
-        
+     
 ---------------------------------------------------------------------------
 -- Évaluateur                                                            --
 ---------------------------------------------------------------------------
@@ -324,7 +385,6 @@ eval :: VEnv -> Lexp -> Value
 eval _venv (Lnum n) = Vnum n
 eval venv (Lvar x) = mlookup venv x
 -- ¡¡COMPLÉTER ICI!!
-
 
 
 -- État de l'évaluateur.
@@ -385,3 +445,6 @@ typeOf = synth tenv0 . lexpOf
 
 valOf :: String -> Value
 valOf = eval venv0 . lexpOf
+
+
+
