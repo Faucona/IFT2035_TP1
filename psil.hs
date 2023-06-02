@@ -309,15 +309,41 @@ tenv0 = [("+", Larw Lint (Larw Lint Lint)),
 -- `check Γ e τ` vérifie que `e` a type `τ` dans le contexte `Γ`.
 check :: TEnv -> Lexp -> Ltype -> Maybe TypeError
 
---check tenv (exp1 exp2) t = 
+--variable local
+check tenv (Llet var e1 e2) t = do 
+    let tenv' = minsert tenv var (synth tenv e1)
+    check tenv' e2 t
 
+--Fonction anonyme
+check tenv (Lfun var e) t = case t of 
+    Larw argType resType -> do
+        let tenv' = minsert tenv var argType
+        check tenv' e resType
+        -> Just("Erreur de type: La fonction n'est pas dans le type attendu.")
 
 -- ¡¡COMPLÉTER ICI!!
+--variable local
+check tenv (Llet var e1 e2) t = do 
+    let tenv' = minsert tenv var (synth tenv e1)
+    check tenv' e2 t
 
-check tenv e t
-  -- Essaie d'inférer le type et vérifie alors s'il correspond au
-  -- type attendu.
-  = let t' = synth tenv e
+--Fonction anonyme
+check tenv (Lfun var e) t = case t of 
+    Larw argType resType -> do
+        let tenv' = minsert tenv var argType
+        check tenv' e resType
+        -> Just("Erreur de type: La fonction n'est pas dans le type attendu.")
+
+--Appel fonction avec argument
+check tenv (Lapp e1 e2) t = case synth tenv e1 of 
+    Larw argType resType -> do
+        check tenv e2 argType
+        if resType == t then Nothing
+        else Just ("Erreur de type:")
+        -> Just "Erreur de type"
+
+check tenv e t = 
+    let t' = synth tenv e
     in if t == t' then Nothing
        else Just ("Erreur de type: " ++ show t ++ " ≠ " ++ show t')
 
