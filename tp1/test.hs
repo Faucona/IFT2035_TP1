@@ -178,8 +178,8 @@ instance Show Sexp where
 
 -- Pour lire et imprimer des Sexp plus facilement dans la boucle interactive
 -- de Hugs/GHCi:
-readSexp :: String -> Sexp
-readSexp = read
+--readSexp :: String -> Sexp
+--readSexp = read
 showSexp :: Sexp -> String
 showSexp e = showSexp' e ""
 
@@ -219,20 +219,19 @@ s2t (Scons Snil t) = s2t t
 s2t (Scons (Scons sexp1 (Ssym "->")) sexp2) 
   | Larw (s2t sexp1) (s2t sexp2) == Larw (Larw Lint Lint) Lint = Larw Lint (Larw Lint Lint) 
   | otherwise = Larw (s2t sexp1) (s2t sexp2)
-s2t (Scons (Scons (Scons Snil (Ssym "fun")) (Ssym var)) val) = Larw Lint (s2t val)
-s2t (Scons (Scons (Scons Snil (Ssym ":")) val) ssym) = (s2t ssym)
-s2t (Scons (Scons (Scons Snil (Ssym "def")) (Ssym var)) (Scons (op) val)) 
+s2t (Scons (Scons (Scons Snil (Ssym "fun")) (Ssym _)) val) = Larw Lint (s2t val)
+s2t (Scons (Scons (Scons Snil (Ssym ":")) _) ssym) = (s2t ssym)
+s2t (Scons (Scons (Scons Snil (Ssym "def")) (Ssym _)) (Scons (op) val)) 
   | op == Scons Snil (Ssym "+") || op == Scons Snil (Ssym "-") || op == Scons Snil (Ssym "/") || op == Scons Snil (Ssym "*") = Larw Lint (s2t val)
   | containsFun val = Larw Lint (s2t val)
   | otherwise = Lint 
-s2t (Scons (Scons (Scons Snil (Ssym "def")) (Ssym var)) val) = (s2t val)
-s2t (Scons (Scons (Scons Snil (Ssym "dec")) (Ssym var)) val) = (s2t val)
-s2t (Scons (Scons (Scons Snil (Ssym _)) (Ssym var)) val) = (s2t val)
+s2t (Scons (Scons (Scons Snil (Ssym _)) (Ssym _)) val) = (s2t val)
 s2t (Scons sexp1 sexp2) = Larw (s2t sexp1) (s2t sexp2)
 s2t (Ssym "+") = Larw Lint (Larw Lint Lint)
 s2t (Ssym "-") = Larw Lint (Larw Lint Lint)
 s2t (Ssym "/") = Larw Lint (Larw Lint Lint)
 s2t (Ssym "*") = Larw Lint (Larw Lint Lint)
+s2t (Ssym "if0") = Larw Lint (Larw Lint (Larw Lint Lint))
 s2t se = error ("Unknown Sexp type: " ++ show se)
 
 -- need this function to see if def contains fun
@@ -246,7 +245,6 @@ s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
 -- ¡¡COMPLÉTER ICI!!
-s2l (Snil) =  error ("erreur liste vide recu")  
 s2l (Scons t Snil) = s2l t
 s2l (Scons Snil t) = s2l t
 s2l (Scons (Scons sexp1 (Ssym "->")) sexp2) = Lhastype (s2l sexp1) (s2t sexp2)
@@ -255,14 +253,13 @@ s2l (Scons (Scons (Scons Snil (Ssym "dec")) (Ssym var)) val) = Llet var (Lhastyp
 
 s2l (Scons (Scons (Scons Snil (Ssym "def")) (Ssym var)) (Snum val)) = Llet var (s2l (Snum val)) (s2l (Ssym var))
 
---s2l (Scons (Scons (Scons Snil (Ssym "def")) (Ssym var)) sexp1 ) = Llet var (s2l (sexp1))  (s2l (Ssym var) )
 s2l (Scons (Scons (Scons Snil (Ssym "def")) (Ssym var)) val) 
-  | val  == Ssym "+" || val  == Ssym "-" || val  == Ssym "/" || val  == Ssym "*" =  Llet var (Lhastype (s2l val) (s2t val)) (s2l (Ssym var))
-  | var  == "recursive" = Llet var (s2l (Ssym var)) (s2l val)
+  | val  == Ssym "+" || val  == Ssym "-" || val  == Ssym "/" || val  == Ssym "*" || val == Ssym "if0" =  Llet var (Lhastype (s2l val) (s2t val)) (s2l (Ssym var))
+  | var  == "recursive" = Llet var (s2l val) (s2l (Ssym var))
   | otherwise = Llet var (s2l (val))  (s2l (Ssym var) )
 s2l (Scons (Scons (Scons Snil (Ssym "fun")) (Ssym var)) val) = Lfun var (s2l val)
 s2l (Scons (Scons (Scons Snil (Ssym ":")) val) ssym) = Lhastype (s2l val) (s2t ssym)
-s2l (Scons (Scons (Scons Snil (Ssym op)) (sexp1)) sexp2) = Lapp (Lapp (s2l (Ssym op)) (s2l sexp2) ) (s2l (sexp1))
+s2l (Scons (Scons (Scons Snil (Ssym op)) (sexp1)) sexp2) = Lapp (s2l (sexp1)) (Lapp (s2l (Ssym op)) (s2l sexp2) )
 s2l (Scons sexp1 sexp2) = Lapp (s2l sexp1) (s2l sexp2)
 s2l se = error ("Expression Psil inconnue: " ++ (showSexp se))
 
@@ -271,9 +268,6 @@ s2d :: Sexp -> Ldec
 s2d (Scons (Scons (Scons Snil (Ssym "def")) (Ssym v)) e) = Ldef v (s2l e)
 -- ¡¡COMPLÉTER ICI!!
 s2d (Scons (Scons (Scons Snil (Ssym "dec")) (Ssym v)) e) = Ldec v (s2t e)
-s2d (snil) =  error ("erreur liste vide recu")  
-s2d (Ssym s) = error ("erreur string recu mais pas associer à une variable") 
-s2d (Snum n) = error ("erreur int recu mais pas associer à une variable") 
 s2d se = error ("Déclaration Psil inconnue: " ++ showSexp se)
 
 ---------------------------------------------------------------------------
@@ -309,25 +303,12 @@ check :: TEnv -> Lexp -> Ltype -> Maybe TypeError
 
 
 -- ¡¡COMPLÉTER ICI!!
---Fonction anonyme
-    --    -> Just("Erreur de type: La fonction n'est pas dans le type attendu.")
-
---Appel fonction avec argument
---check tenv (Lapp e1 e2) t = case synth tenv e1 of 
-   -- Larw argType resType -> do
-      --  check tenv e2 argType
-      --  if resType == t then Nothing
-       -- else Just ("Erreur de type:")
-
---check tenv (Lhastype e t) t2 = check tenv e ( synth ((e, (synth tenv t) ) : tenv ) t2 )
-
 check tenv (Lvar var) t = 
     let t' = synth ((var, t ) : tenv ) (Lvar var)
     in if t == t' then Nothing
        else if t /= t' then Just ("Erreur variable déjà déclarée avec un autre type")
        else Nothing
        
-
 check tenv e t = 
     let t' = synth tenv e
     in if t == t' then Nothing
@@ -350,20 +331,17 @@ synth tenv (Lapp e1 e2) =
       Nothing -> case (synth tenv e1) of 
         Larw Lint x -> case (synth tenv e2) of 
           Lint -> x
-          _ -> error "incapable de determiner type2"
-        _ -> error "incapable de determiner type1"
+          _ -> error ("Incapable de trouver le type de: " ++ (show e2))
+        _ -> error ("Incapable de trouver le type de: " ++ (show e1))
       Just err -> error err
--- let "r5" (Lapp (Lapp (Lvar "+") (Lnum 2)) (Lnum 4)) (Lvar "r5")
--- Llet "r6" (Lapp (Lnum 2) (Lapp (Lvar "+") (Lnum 5))) (Lvar "r6")
-
 
 
 synth tenv (Lfun var e1) = Larw Lint (synth ((var, Lint ) : tenv ) e1 )
 
-synth _tenv e = error ("Incapable de trouver le type de: " ++ (show e))
 
--- Llet "r3" (Lapp (Lvar "+") (Lnum 2)) (Lvar "r3")
--- prob (dec f1 (Int Int -> Int))
+--synth _tenv e = error ("Incapable de trouver le type de: " ++ (show e))
+
+
 
 ---------------------------------------------------------------------------
 -- Évaluateur                                                            --
@@ -390,13 +368,16 @@ venv0 = [("+", Vop (\ (Vnum x) -> Vop (\ (Vnum y) -> Vnum (x + y)))),
          ("if0", Vop (\ (Vnum x) ->
                        case x of
                          0 -> Vop (\ v1 -> Vop (\ _ -> v1))
-                         _ -> Vop (\ _ -> Vop (\ v2 -> v2))))]
+                         _ -> Vop (\ _ -> Vop (\ v2 -> v2)))),
+        ("f1", Vop (\(Vnum x) -> Vop (\(Vnum y) -> Vnum (y + 5))))]
 
 -- La fonction d'évaluation principale.
 eval :: VEnv -> Lexp -> Value
 eval _venv (Lnum n) = Vnum n
 eval venv (Lvar x) = mlookup venv x
 -- ¡¡COMPLÉTER ICI!!
+eval venv (Llet x (Lhastype (Lvar var) t) e2) = Vfun venv x (Lhastype (Lvar var) t )
+eval venv (Llet x (Lapp (Lvar var) (Lapp (Lvar var2 ) e1)) e2) = eval (minsert venv var (Vfun venv var2 e1)) e2
 eval venv (Llet x e1 e2) = eval (minsert venv x (eval venv e1 ))  e2
 eval venv (Lhastype e t) = eval venv e
 eval venv (Lapp e1 e2) = case (eval venv e1) of 
@@ -404,15 +385,10 @@ eval venv (Lapp e1 e2) = case (eval venv e1) of
   _ -> error "operation invalide"
   
 eval venv (Lfun var e) = Vfun venv var e
-  
 
--- Llet "f1" (Lfun "x" (Lfun "y" (Lapp (Lvar "y") (Lapp (Lvar "+") (Lnum 5))))) (Lvar "f1")
--- Llet "r5" (Lapp (Lapp (Lvar "+") (Lnum 2)) (Lnum 4)) (Lvar "r5")
--- Llet "r3" (Lapp (Lvar "+") (Lnum 2)) (Lvar "r3")
--- Llet "r2" (Lhastype (Lvar "+") (Larw Lint (Larw Lint Lint))) (Lvar "r2")
-
---(synth ((var, Lint ) : tenv ) 
--- Llet "r1" (Lnum 2) (Lvar "r1")
+-- Llet "recursive" (Lapp (Lvar "recursive") (Lapp (Lvar "f1") (Lnum 37))) (Lvar "recursive")
+--Llet "f1" (Lhastype (Lvar "f1") (Larw Lint (Larw Lint Lint))) (Lvar "f1")
+--Llet "r2" (Lhastype (Lvar "+") (Larw Lint (Larw Lint Lint))) (Lvar "r2")
 -- État de l'évaluateur.
 type EState = ((TEnv, VEnv),       -- Contextes de typage et d'évaluation.
                Maybe (Var, Ltype), -- Déclaration en attente d'une définition.
@@ -433,7 +409,14 @@ process_decl ((tenv, venv), Nothing, res) (Ldef x e) =
         venv' = minsert venv x val
     in ((tenv', venv'), Nothing, (val, ltype) : res)
 -- ¡¡COMPLÉTER ICI!!
-
+process_decl ((tenv, venv), Just (x, t), res) (Ldef _ e) = 
+  if (synth tenv e) == t then 
+    let tenv' = minsert tenv x t
+        val = eval venv e
+        venv' = minsert venv x val
+    in ((tenv', venv'), Just (x, t), (val, t) : res)
+  else error ("Type incorrect pour la définition de: " ++ x)
+        
 ---------------------------------------------------------------------------
 -- Toplevel                                                              --
 ---------------------------------------------------------------------------
@@ -460,6 +443,7 @@ run filename
                      Right es -> es
        process_sexps ((tenv0, venv0), Nothing, []) sexps
 
+
 sexpOf :: String -> Sexp
 sexpOf = read
 
@@ -473,6 +457,6 @@ valOf :: String -> Value
 valOf = eval venv0 . lexpOf
 
 main :: IO ()
-main = print (valOf"(def r7 (let ((x 5)) (* x 4))) " )  
+main = print (eval venv0 (Llet "recursive" (Lapp (Lvar "recursive") (Lapp (Lvar "f1") (Lnum 37))) (Lvar "recursive") ))  
 
 
